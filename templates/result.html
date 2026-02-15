@@ -71,6 +71,81 @@
     .result-content code { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 4px; color: #0cc0df; }
     .result-content pre { background: #0f172a; padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid #334155; }
     .result-content pre code { background: none; padding: 0; color: #e2e8f0; }
+
+    /* Code blocks */
+    .result-content pre {
+        background: #0f172a;
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        border: 1px solid #334155;
+        margin: 1rem 0;
+    }
+    
+    .result-content code {
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 0.9rem;
+        color: #e2e8f0;
+    }
+    
+    /* Inline code */
+    .result-content :not(pre) > code {
+        background: #0f172a;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        color: #0cc0df;
+    }
+    
+    /* Headers */
+    .result-content h1 { color: white; font-size: 1.8rem; margin: 1.5rem 0 1rem; }
+    .result-content h2 { color: white; font-size: 1.5rem; margin: 1.5rem 0 1rem; }
+    .result-content h3 { color: white; font-size: 1.25rem; margin: 1.5rem 0 1rem; }
+    
+    /* Lists */
+    .result-content ul, .result-content ol {
+        margin: 1rem 0;
+        padding-left: 1.5rem;
+    }
+    
+    .result-content li {
+        color: #94a3b8;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Bold text */
+    .result-content strong {
+        color: white;
+    }
+    
+    /* Blockquotes */
+    .result-content blockquote {
+        border-left: 4px solid #0cc0df;
+        margin: 1rem 0;
+        padding: 0.5rem 1rem;
+        background: rgba(12, 192, 223, 0.05);
+        color: #94a3b8;
+    }
+    
+    /* Tables */
+    .result-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+    }
+    
+    .result-content th {
+        background: #1e293b;
+        color: white;
+        padding: 0.5rem;
+        text-align: left;
+        border: 1px solid #334155;
+    }
+    
+    .result-content td {
+        padding: 0.5rem;
+        border: 1px solid #334155;
+        color: #94a3b8;
+    }
     
     .action-buttons {
         display: flex;

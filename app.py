@@ -12,12 +12,14 @@ app = FastAPI(title="DocuDecipher")
 from routes.dashboard import router as dashboard_router
 from routes.auth import router as auth_router
 from routes.docudecipher import router as docudecipher_router
+from routes.analyze import router as analyze_router
 
 # Include routers
 app.include_router(dashboard_router)
 app.include_router(auth_router)
 app.include_router(docudecipher_router)
 app.include_router(settings_router)
+app.include_router(analyze_router)
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")

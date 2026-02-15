@@ -269,14 +269,44 @@
             flex-direction: column;
         }
     }
-</style>
 
-<div class="analyzer-container">
-    <div class="analyzer-header">
-        <i class="fas fa-shield-alt"></i>
-        <h1>Security Scan</h1>
-        <p>Find vulnerabilities, hardcoded secrets, and security issues</p>
-    </div>
+    /* Code blocks */
+    .result-content pre {
+        background: #1e293b;
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        border: 1px solid #334155;
+        margin: 1rem 0;
+        color: #e2e8f0;
+    }
+
+    /* Inline code */
+    .result-content code {
+        background: #1e293b;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        color: #0cc0df;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+    }
+
+    /* Remove any markdown symbols that slip through */
+    .result-content {
+        /* Your existing styles */
+    }
+
+    /* Hide markdown symbols if they appear */
+    .result-content p:first-child:contains("#") {
+        /* This is tricky - better to fix at source */
+    }
+    </style>
+
+    <div class="analyzer-container">
+        <div class="analyzer-header">
+            <i class="fas fa-shield-alt"></i>
+            <h1>Security Scan</h1>
+            <p>Find vulnerabilities, hardcoded secrets, and security issues</p>
+        </div>
     
     <div class="card">
         <!-- Input Method Tabs -->

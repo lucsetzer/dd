@@ -20,10 +20,12 @@ async def login_page(request: Request):
 
 @router.post("/login")
 async def login_request(email: str = Form(...)):
+    print(f"🔐 LOGIN REQUEST for: {email}")
     """Clean route - delegates to business logic."""
     
     # Generate magic link
     token = generate_magic_link(email)
+    print(f"📧 Magic link would be: http://localhost:8001/auth?token={token}")
     
     # Store token
     print(f"\n2️⃣ ATTEMPTING TO STORE TOKEN...")

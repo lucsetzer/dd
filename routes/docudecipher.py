@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Request, Query, Cookie, File, UploadFile, Form
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pathlib import Path
 from dotenv import load_dotenv
+from shared.utils import loading_response
 
 import git
 import tempfile
@@ -23,7 +24,7 @@ load_dotenv()
 analysis_queue = {}
 
 async def loading_response(analysis_id: str):
-    """Return loading page for analysis jobs"""
+    """Return loading page with auto-refresh"""
     html = f'''
     <!DOCTYPE html>
     <html>
@@ -31,54 +32,72 @@ async def loading_response(analysis_id: str):
         <title>Analyzing...</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link rel="stylesheet" href="/static/css/brand.css">
+        <meta http-equiv="refresh" content="3">
         <style>
+            /* Keep all your beautiful existing styles */
             body {{
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 background: #0f172a;
                 color: white;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 margin: 0;
-                padding: 0;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
             }}
-            .container {{
-                max-width: 600px;
+            .loading-container {{
                 text-align: center;
-                padding: 3rem;
+                padding: 2rem;
+            }}
+            .icon {{
+                font-size: 4rem;
+                color: #fbbf24;
+                margin-bottom: 1rem;
+            }}
+            h1 {{
+                color: white;
+                margin-bottom: 1rem;
+            }}
+            .progress-bar {{
+                width: 300px;
+                height: 6px;
+                background: #1e293b;
+                border-radius: 3px;
+                margin: 2rem auto;
+                overflow: hidden;
+            }}
+            .progress-fill {{
+                height: 100%;
+                background: #0cc0df;
+                width: 30%;
+                border-radius: 3px;
+                animation: pulse 2s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ opacity: 0.6; width: 30%; }}
+                50% {{ opacity: 1; width: 70%; }}
+                100% {{ opacity: 0.6; width: 30%; }}
+            }}
+            .status-message {{
+                color: #94a3b8;
+                margin-top: 1rem;
             }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <div>
+        <div class="loading-container">
+            <div class="icon">
                 <i class="fas fa-lightbulb"></i>
             </div>
-            <h1>Analyzing Repository</h1>
-            <p id="status">Cloning and analyzing code structure...</p>
+            <h1>Analyzing GitHub Repository</h1>
+            <p>This will take 30-60 seconds depending on repo size</p>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="status-message">
+                Page refreshes automatically • Please wait
+            </div>
         </div>
-        <script>
-            const analysisId = "{analysis_id}";
-            function checkProgress() {{
-                fetch('/api/analysis-status/' + analysisId)
-                    .then(r => r.json())
-                    .then(data => {{
-                        if (data.status === 'complete') {{
-                            window.location.href = '/result/' + analysisId;
-                        }} else if (data.status === 'error') {{
-                            window.location.href = '/error?message=' + encodeURIComponent(data.error);
-                        }} else {{
-                            if (data.message) {{
-                                document.getElementById('status').textContent = data.message;
-                            }}
-                            setTimeout(checkProgress, 1000);
-                        }}
-                    }})
-                    .catch(() => setTimeout(checkProgress, 2000));
-            }}
-            setTimeout(checkProgress, 1000);
-        </script>
     </body>
     </html>
     '''
@@ -880,7 +899,7 @@ async def process_document(
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
+            background: #0f172a;
             color: #fff;
             margin: 0;
             padding: 0;
@@ -1079,6 +1098,10 @@ async def process_url(
 # ========== RESULT BY ID ==========
 @router.get("/result/{analysis_id}")
 async def show_result_by_id(analysis_id: str, request: Request):
+    print(f"🔍 RESULTS PAGE CALLED for {analysis_id}")
+    print(f"🔍 Queue keys: {list(analysis_queue.keys())}")
+    print(f"🔍 Data for {analysis_id}: {analysis_queue.get(analysis_id, {}).keys()}")
+    
     if analysis_id not in analysis_queue:
         return HTMLResponse(layout("Result Not Found", '''
             <div style="text-align: center; padding: 4rem 0;">
@@ -1096,22 +1119,7 @@ async def show_result_by_id(analysis_id: str, request: Request):
     data = analysis_queue[analysis_id]
     
     if data["status"] != "complete":
-        return HTMLResponse(layout("Processing", f'''
-            <div style="text-align: center; padding: 4rem 0;">
-                <div style="font-size: 4rem; color: #fbbf24; margin-bottom: 1rem;">
-                    <i class="fas fa-lightbulb" style="background: #fbbf24;"></i>
-                </div>
-                <h1 style="color: #0cc0df;">Still Analyzing</h1>
-                <p style="color: #94a3b8;">Your {get_analysis_type(data)} is being processed...</p>
-                <div style="width: 100%; max-width: 400px; margin: 2rem auto;">
-                    <div style="background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden;">
-                        <div style="background: #fbbf24; width: {data.get('progress', 0.5)*100}%; height: 100%; transition: width 0.5s;"></div>
-                    </div>
-                </div>
-                <p style="color: #64748b;" id="status-message">{data.get('message', 'Working...')}</p>
-                <meta http-equiv="refresh" content="2;url=/result/{analysis_id}">
-            </div>
-        '''))
+        return await loading_response(analysis)
     
     # Get the result text
     ai_text = data.get("result", "No result generated")
@@ -1155,7 +1163,7 @@ async def show_github_result(data: dict, ai_text: str, is_mock: bool):
             <div style="font-size: 3rem; color: #fbbf24; margin-bottom: 1rem;">
                 <i class="fab fa-github"></i>
             </div>
-            <h1 style="color: #fbbf24;">Repository Analysis Complete</h1>
+            <h1 style="color: #0cc0df;">Repository Analysis Complete</h1>
             <p style="color: #94a3b8;">
                 <strong>{repo_name}</strong> • {file_count} files analyzed
             </p>
@@ -1166,7 +1174,7 @@ async def show_github_result(data: dict, ai_text: str, is_mock: bool):
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h2 style="color: white; margin: 0;">Analysis Results</h2>
                 <button onclick="copyText()" 
-                        style="background: #fbbf24; color: #0f172a; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                        style="background: #0cc0df; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: bold;"
                         id="copy-btn">
                     <i class="fas fa-copy"></i> Copy
                 </button>
@@ -1891,7 +1899,7 @@ async def process_github(
     include_patterns: str = Form("*.py,*.js,*.json,*.md,*.yml"),
     specific_questions: str = Form(""),
     level: str = Form("professional"),
-    doc_type: str = Form("github")  # Keep for compatibility
+    doc_type: str = Form("github")
 ):
     """Clone and analyze a GitHub repository"""
     analysis_id = str(uuid.uuid4())
@@ -1912,7 +1920,17 @@ async def process_github(
     # Start background task
     asyncio.create_task(analyze_github_background(analysis_id))
     
-    # Return loading page (reuse your existing loading template)
+    # REDIRECT to a loading page URL, don't return loading directly
+    return RedirectResponse(url=f"/github-loading/{analysis_id}", status_code=303)
+
+@router.get("/github-loading/{analysis_id}")
+async def github_loading(analysis_id: str, request: Request):
+    """Show loading page for GitHub analysis"""
+    # Check if analysis exists
+    if analysis_id not in analysis_queue:
+        return RedirectResponse(url="/analyze/github", status_code=303)
+    
+    # Return your existing loading response
     return await loading_response(analysis_id)
 
 # ========== SECURITY ANALYSIS ==========
@@ -2072,6 +2090,8 @@ Focus on high and critical severity issues."""
         
         prompt = security_prompts.get(scan_type, security_prompts["full"])
         prompt = prompt.format(threshold=threshold)
+
+        prompt += "\n\nCRITICAL FORMATTING RULE: Respond in PLAIN TEXT ONLY. Absolutely NO markdown symbols (#, *, -, `, >, []). NO asterisks for bold. NO hash symbols for headers. Just use plain sentences with line breaks between sections."
         
         if data["specific_questions"]:
             prompt += f"\n\nSPECIFIC QUESTIONS:\n{data['specific_questions']}"
@@ -2328,7 +2348,7 @@ async def security_loading_response(analysis_id: str):
         <style>
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #000;
+                background: #0f172a;
                 color: #fff;
                 margin: 0;
                 padding: 0;
@@ -2344,7 +2364,7 @@ async def security_loading_response(analysis_id: str):
             }}
             .shield {{
                 font-size: 4rem;
-                color: #dc2626;
+                color: #0cc0df;
                 margin-bottom: 1rem;
                 animation: pulse 2s infinite;
             }}
@@ -2356,8 +2376,8 @@ async def security_loading_response(analysis_id: str):
             .spinner {{
                 width: 50px;
                 height: 50px;
-                border: 3px solid #374151;
-                border-top-color: #dc2626;
+                border: 3px solid #0cc0df;
+                border-top-color: #0cc0df;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
                 margin: 2rem auto;
@@ -2365,10 +2385,10 @@ async def security_loading_response(analysis_id: str):
             @keyframes spin {{
                 to {{ transform: rotate(360deg); }}
             }}
-            h1 {{ color: #dc2626; margin-bottom: 1rem; }}
-            p {{ color: #9ca3af; margin-bottom: 2rem; }}
+            h1 {{ color: #0cc0df; margin-bottom: 1rem; }}
+            p {{ color: #0cc0df; margin-bottom: 2rem; }}
             .status-box {{
-                background: rgba(220, 38, 38, 0.1);
+                background: #1e293b;
                 border-left: 4px solid #dc2626;
                 padding: 1rem;
                 border-radius: 4px;
@@ -2388,7 +2408,7 @@ async def security_loading_response(analysis_id: str):
             <div class="spinner"></div>
             
             <div class="status-box">
-                <p style="margin: 0; color: #dc2626;">
+                <p style="margin: 0; color: #0cc0df;">
                     <i class="fas fa-info-circle"></i>
                     <span id="tip">Scanning for hardcoded secrets and vulnerabilities...</span>
                 </p>
@@ -2433,8 +2453,10 @@ async def docudecipher_home(request: Request):
 
 # ===== Functions ======
 async def analyze_github_background(analysis_id: str):
-    """Background task for GitHub analysis"""
+    print(f"🔥 BACKGROUND STARTED for {analysis_id}")  # ← ALREADY HERE
+    
     data = analysis_queue[analysis_id]
+    print(f"📦 Got data from queue")  # ← ADD HERE
     
     temp_dir = None
     try:
@@ -2452,6 +2474,7 @@ async def analyze_github_background(analysis_id: str):
             branch=data['branch'],
             depth=1  # Shallow clone for speed
         )
+        print(f"✅ Repository cloned")  # ← ADD HERE
         
         data["progress"] = 0.4
         data["message"] = "Analyzing repository structure..."
@@ -2497,6 +2520,7 @@ async def analyze_github_background(analysis_id: str):
         # Sort by size (smallest first) and limit
         files.sort(key=lambda x: x.get('size', 0))
         files = files[:30]  # Analyze top 30 files
+        print(f"📁 Found {len(files)} files")  # ← ADD HERE
         
         data["progress"] = 0.6
         data["message"] = f"Analyzing {len(files)} files with AI..."
@@ -2531,6 +2555,8 @@ Keep analysis under 800 words. Use bullet points."""
         # Call AI (reuse your existing DeepSeek logic)
         api_key = os.getenv("DEEPSEEK_API_KEY")
         
+        print(f"🤖 About to call AI")  # ← ADD HERE
+        
         if not api_key or api_key.startswith("your-"):
             ai_text = f"""📦 **Repository Analysis (Mock)**
 
@@ -2556,6 +2582,7 @@ Keep analysis under 800 words. Use bullet points."""
 *This is a placeholder. Add DEEPSEEK_API_KEY to .env for real AI analysis.*
 """
             data["is_mock"] = True
+            print(f"🤖 Using mock response (no API key)")  # ← ADD HERE
         else:
             # Your existing DeepSeek API call here
             from openai import AsyncOpenAI
@@ -2577,6 +2604,7 @@ Keep analysis under 800 words. Use bullet points."""
             
             ai_text = response.choices[0].message.content
             data["is_mock"] = False
+            print(f"🤖 AI responded successfully")  # ← ADD HERE
         
         # Store result
         data["result"] = ai_text
@@ -2584,15 +2612,25 @@ Keep analysis under 800 words. Use bullet points."""
         data["progress"] = 1.0
         data["message"] = "Analysis complete!"
         data["file_count"] = len(files)
+        print(f"💾 About to save result")  # ← ADD HERE
+        
+        # SAVE TO FILE QUEUE
+        from shared.file_queue import save_analysis
+        save_analysis(analysis_id, data)
+        print(f"✅ Function complete for {analysis_id}")  # ← ADD HERE
         
     except git.exc.GitCommandError as e:
         data["status"] = "error"
         data["error"] = f"Git error: {str(e)}"
         data["message"] = "Failed to clone repository. Check URL and visibility."
+        print(f"❌ Git error: {e}")  # ← ADD HERE
     except Exception as e:
         data["status"] = "error"
         data["error"] = str(e)
         data["message"] = f"Analysis failed: {str(e)}"
+        print(f"❌ Error: {e}")  # ← ADD HERE
+        import traceback
+        traceback.print_exc()
     finally:
         # Clean up temp directory
         if temp_dir and os.path.exists(temp_dir):
